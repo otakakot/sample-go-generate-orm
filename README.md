@@ -1,0 +1,1 @@
+# sample-go-generate-orm
