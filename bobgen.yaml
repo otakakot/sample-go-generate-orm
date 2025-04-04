@@ -1,0 +1,8 @@
+no_factory: true
+no_tests: true
+psql:
+  dsn: "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
+  driver_name: "github.com/lib/pq"
+  output: "pkg/bobgen"
+  pkgname: "bobgen"
+  uuid_pkg: "github.com/google/uuid"

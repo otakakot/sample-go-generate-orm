@@ -1,7 +1,7 @@
 services:
   postgres:
     container_name: postgres
-    image: postgres:16.1-alpine
+    image: postgres:17-alpine
     ports:
       - 5432:5432
     environment:
@@ -12,4 +12,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
       POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - ../schema:/docker-entrypoint-initdb.d
+    command: ["postgres", "-c", "log_statement=all"]
     restart: always
