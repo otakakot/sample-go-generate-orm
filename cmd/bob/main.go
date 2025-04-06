@@ -33,38 +33,14 @@ func main() {
 	}
 
 	// 事前データ準備
-	if _, err := db.ExecContext(ctx, "TRUNCATE TABLE users, posts CASCADE"); err != nil {
+	if _, err := db.ExecContext(ctx, "TRUNCATE TABLE users CASCADE"); err != nil {
 		panic(err)
 	}
 
-	tmpUser1, err := models.Users.Insert(&models.UserSetter{
-		Name: omit.From(uuid.NewString()),
+	tmp, err := models.Users.Insert(&models.UserSetter{
+		Name: omit.From("name"),
 	}).One(ctx, db)
 	if err != nil {
-		panic(err)
-	}
-
-	if _, err := models.Posts.Insert(&models.PostSetter{
-		UserID:  omit.From(tmpUser1.ID),
-		Title:   omit.From("1"),
-		Content: omit.From("1"),
-	}).One(ctx, db); err != nil {
-		panic(err)
-	}
-
-	if _, err := models.Posts.Insert(&models.PostSetter{
-		UserID:  omit.From(tmpUser1.ID),
-		Title:   omit.From("2"),
-		Content: omit.From("2"),
-	}).One(ctx, db); err != nil {
-		panic(err)
-	}
-
-	if _, err := models.Posts.Insert(&models.PostSetter{
-		UserID:  omit.From(tmpUser1.ID),
-		Title:   omit.From("3"),
-		Content: omit.From("3"),
-	}).One(ctx, db); err != nil {
 		panic(err)
 	}
 
@@ -79,21 +55,21 @@ func main() {
 	}
 
 	// SELECT WHERE
-	got, err := models.FindUser(ctx, db, tmpUser1.ID)
+	got, err := models.FindUser(ctx, db, tmp.ID)
 	if err != nil {
 		panic(err)
 	}
 
 	slog.Info(fmt.Sprintf("user: %+v", got))
 
-	posts, err := models.Posts.View.Query(
-		models.SelectWhere.Posts.UserID.EQ(got.ID),
+	users, err := models.Users.View.Query(
+		models.SelectWhere.Users.Name.EQ("name"),
 	).All(ctx, db)
 	if err != nil {
 		panic(err)
 	}
-	for _, post := range posts {
-		slog.Info(fmt.Sprintf("post: %+v", post))
+	for _, user := range users {
+		slog.Info(fmt.Sprintf("user: %+v", user))
 	}
 
 	// INSERT
@@ -111,17 +87,18 @@ func main() {
 		panic(err)
 	}
 
-	updated, err := models.FindUser(ctx, db, tmpUser1.ID)
+	updated, err := models.FindUser(ctx, db, tmp.ID)
 	if err != nil {
 		panic(err)
 	}
+
 	slog.Info(fmt.Sprintf("updated user: %+v", updated))
 
 	// INSERT ON CONFLICT DO NOTHING
 	if _, err := models.Users.Insert(&models.UserSetter{
-		ID:   omit.From(user.ID),
-		Name: omit.From("Upserted " + user.Name),
-	}, im.OnConflict("id").DoNothing()).One(ctx, db); err != nil {
+		ID:   omit.From(updated.ID),
+		Name: omit.From("Upserted " + updated.Name),
+	}, im.OnConflict("id").DoNothing()).One(ctx, db); err != nil && err != sql.ErrNoRows {
 		panic(err)
 	}
 
@@ -198,12 +175,12 @@ func main() {
 		panic(err)
 	}
 
-	users, err := models.Users.Query().All(ctx, db)
+	all, err := models.Users.Query().All(ctx, db)
 	if err != nil {
 		panic(err)
 	}
 
-	for _, user := range users {
+	for _, user := range all {
 		slog.Info(fmt.Sprintf("user: %+v", user))
 	}
 }

@@ -45,7 +45,7 @@ type UsersQuery = *psql.ViewQuery[*User, UserSlice]
 
 // userR is where relationships are stored.
 type userR struct {
-	Posts PostSlice // posts.posts_user_id_fkey
+	Todos TodoSlice // todos.todos_user_id_fkey
 }
 
 type userColumnNames struct {
@@ -455,7 +455,7 @@ func (o UserSlice) ReloadAll(ctx context.Context, exec bob.Executor) error {
 
 type userJoins[Q dialect.Joinable] struct {
 	typ   string
-	Posts func(context.Context) modAs[Q, postColumns]
+	Todos func(context.Context) modAs[Q, todoColumns]
 }
 
 func (j userJoins[Q]) aliasedAs(alias string) userJoins[Q] {
@@ -465,19 +465,19 @@ func (j userJoins[Q]) aliasedAs(alias string) userJoins[Q] {
 func buildUserJoins[Q dialect.Joinable](cols userColumns, typ string) userJoins[Q] {
 	return userJoins[Q]{
 		typ:   typ,
-		Posts: usersJoinPosts[Q](cols, typ),
+		Todos: usersJoinTodos[Q](cols, typ),
 	}
 }
 
-func usersJoinPosts[Q dialect.Joinable](from userColumns, typ string) func(context.Context) modAs[Q, postColumns] {
-	return func(ctx context.Context) modAs[Q, postColumns] {
-		return modAs[Q, postColumns]{
-			c: PostColumns,
-			f: func(to postColumns) bob.Mod[Q] {
+func usersJoinTodos[Q dialect.Joinable](from userColumns, typ string) func(context.Context) modAs[Q, todoColumns] {
+	return func(ctx context.Context) modAs[Q, todoColumns] {
+		return modAs[Q, todoColumns]{
+			c: TodoColumns,
+			f: func(to todoColumns) bob.Mod[Q] {
 				mods := make(mods.QueryMods[Q], 0, 1)
 
 				{
-					mods = append(mods, dialect.Join[Q](typ, Posts.Name().As(to.Alias())).On(
+					mods = append(mods, dialect.Join[Q](typ, Todos.Name().As(to.Alias())).On(
 						to.UserID.EQ(from.ID),
 					))
 				}
@@ -488,21 +488,21 @@ func usersJoinPosts[Q dialect.Joinable](from userColumns, typ string) func(conte
 	}
 }
 
-// Posts starts a query for related objects on posts
-func (o *User) Posts(mods ...bob.Mod[*dialect.SelectQuery]) PostsQuery {
-	return Posts.Query(append(mods,
-		sm.Where(PostColumns.UserID.EQ(psql.Arg(o.ID))),
+// Todos starts a query for related objects on todos
+func (o *User) Todos(mods ...bob.Mod[*dialect.SelectQuery]) TodosQuery {
+	return Todos.Query(append(mods,
+		sm.Where(TodoColumns.UserID.EQ(psql.Arg(o.ID))),
 	)...)
 }
 
-func (os UserSlice) Posts(mods ...bob.Mod[*dialect.SelectQuery]) PostsQuery {
+func (os UserSlice) Todos(mods ...bob.Mod[*dialect.SelectQuery]) TodosQuery {
 	PKArgs := make([]bob.Expression, len(os))
 	for i, o := range os {
 		PKArgs[i] = psql.ArgGroup(o.ID)
 	}
 
-	return Posts.Query(append(mods,
-		sm.Where(psql.Group(PostColumns.UserID).In(PKArgs...)),
+	return Todos.Query(append(mods,
+		sm.Where(psql.Group(TodoColumns.UserID).In(PKArgs...)),
 	)...)
 }
 
@@ -512,13 +512,13 @@ func (o *User) Preload(name string, retrieved any) error {
 	}
 
 	switch name {
-	case "Posts":
-		rels, ok := retrieved.(PostSlice)
+	case "Todos":
+		rels, ok := retrieved.(TodoSlice)
 		if !ok {
 			return fmt.Errorf("user cannot load %T as %q", retrieved, name)
 		}
 
-		o.R.Posts = rels
+		o.R.Todos = rels
 
 		for _, rel := range rels {
 			if rel != nil {
@@ -531,16 +531,16 @@ func (o *User) Preload(name string, retrieved any) error {
 	}
 }
 
-func ThenLoadUserPosts(queryMods ...bob.Mod[*dialect.SelectQuery]) psql.Loader {
+func ThenLoadUserTodos(queryMods ...bob.Mod[*dialect.SelectQuery]) psql.Loader {
 	return psql.Loader(func(ctx context.Context, exec bob.Executor, retrieved any) error {
 		loader, isLoader := retrieved.(interface {
-			LoadUserPosts(context.Context, bob.Executor, ...bob.Mod[*dialect.SelectQuery]) error
+			LoadUserTodos(context.Context, bob.Executor, ...bob.Mod[*dialect.SelectQuery]) error
 		})
 		if !isLoader {
-			return fmt.Errorf("object %T cannot load UserPosts", retrieved)
+			return fmt.Errorf("object %T cannot load UserTodos", retrieved)
 		}
 
-		err := loader.LoadUserPosts(ctx, exec, queryMods...)
+		err := loader.LoadUserTodos(ctx, exec, queryMods...)
 
 		// Don't cause an issue due to missing relationships
 		if errors.Is(err, sql.ErrNoRows) {
@@ -551,16 +551,16 @@ func ThenLoadUserPosts(queryMods ...bob.Mod[*dialect.SelectQuery]) psql.Loader {
 	})
 }
 
-// LoadUserPosts loads the user's Posts into the .R struct
-func (o *User) LoadUserPosts(ctx context.Context, exec bob.Executor, mods ...bob.Mod[*dialect.SelectQuery]) error {
+// LoadUserTodos loads the user's Todos into the .R struct
+func (o *User) LoadUserTodos(ctx context.Context, exec bob.Executor, mods ...bob.Mod[*dialect.SelectQuery]) error {
 	if o == nil {
 		return nil
 	}
 
 	// Reset the relationship
-	o.R.Posts = nil
+	o.R.Todos = nil
 
-	related, err := o.Posts(mods...).All(ctx, exec)
+	related, err := o.Todos(mods...).All(ctx, exec)
 	if err != nil {
 		return err
 	}
@@ -569,100 +569,100 @@ func (o *User) LoadUserPosts(ctx context.Context, exec bob.Executor, mods ...bob
 		rel.R.User = o
 	}
 
-	o.R.Posts = related
+	o.R.Todos = related
 	return nil
 }
 
-// LoadUserPosts loads the user's Posts into the .R struct
-func (os UserSlice) LoadUserPosts(ctx context.Context, exec bob.Executor, mods ...bob.Mod[*dialect.SelectQuery]) error {
+// LoadUserTodos loads the user's Todos into the .R struct
+func (os UserSlice) LoadUserTodos(ctx context.Context, exec bob.Executor, mods ...bob.Mod[*dialect.SelectQuery]) error {
 	if len(os) == 0 {
 		return nil
 	}
 
-	posts, err := os.Posts(mods...).All(ctx, exec)
+	todos, err := os.Todos(mods...).All(ctx, exec)
 	if err != nil {
 		return err
 	}
 
 	for _, o := range os {
-		o.R.Posts = nil
+		o.R.Todos = nil
 	}
 
 	for _, o := range os {
-		for _, rel := range posts {
+		for _, rel := range todos {
 			if o.ID != rel.UserID {
 				continue
 			}
 
 			rel.R.User = o
 
-			o.R.Posts = append(o.R.Posts, rel)
+			o.R.Todos = append(o.R.Todos, rel)
 		}
 	}
 
 	return nil
 }
 
-func insertUserPosts0(ctx context.Context, exec bob.Executor, posts1 []*PostSetter, user0 *User) (PostSlice, error) {
-	for i := range posts1 {
-		posts1[i].UserID = omit.From(user0.ID)
+func insertUserTodos0(ctx context.Context, exec bob.Executor, todos1 []*TodoSetter, user0 *User) (TodoSlice, error) {
+	for i := range todos1 {
+		todos1[i].UserID = omit.From(user0.ID)
 	}
 
-	ret, err := Posts.Insert(bob.ToMods(posts1...)).All(ctx, exec)
+	ret, err := Todos.Insert(bob.ToMods(todos1...)).All(ctx, exec)
 	if err != nil {
-		return ret, fmt.Errorf("insertUserPosts0: %w", err)
+		return ret, fmt.Errorf("insertUserTodos0: %w", err)
 	}
 
 	return ret, nil
 }
 
-func attachUserPosts0(ctx context.Context, exec bob.Executor, count int, posts1 PostSlice, user0 *User) (PostSlice, error) {
-	setter := &PostSetter{
+func attachUserTodos0(ctx context.Context, exec bob.Executor, count int, todos1 TodoSlice, user0 *User) (TodoSlice, error) {
+	setter := &TodoSetter{
 		UserID: omit.From(user0.ID),
 	}
 
-	err := posts1.UpdateAll(ctx, exec, *setter)
+	err := todos1.UpdateAll(ctx, exec, *setter)
 	if err != nil {
-		return nil, fmt.Errorf("attachUserPosts0: %w", err)
+		return nil, fmt.Errorf("attachUserTodos0: %w", err)
 	}
 
-	return posts1, nil
+	return todos1, nil
 }
 
-func (user0 *User) InsertPosts(ctx context.Context, exec bob.Executor, related ...*PostSetter) error {
+func (user0 *User) InsertTodos(ctx context.Context, exec bob.Executor, related ...*TodoSetter) error {
 	if len(related) == 0 {
 		return nil
 	}
 
 	var err error
 
-	posts1, err := insertUserPosts0(ctx, exec, related, user0)
+	todos1, err := insertUserTodos0(ctx, exec, related, user0)
 	if err != nil {
 		return err
 	}
 
-	user0.R.Posts = append(user0.R.Posts, posts1...)
+	user0.R.Todos = append(user0.R.Todos, todos1...)
 
-	for _, rel := range posts1 {
+	for _, rel := range todos1 {
 		rel.R.User = user0
 	}
 	return nil
 }
 
-func (user0 *User) AttachPosts(ctx context.Context, exec bob.Executor, related ...*Post) error {
+func (user0 *User) AttachTodos(ctx context.Context, exec bob.Executor, related ...*Todo) error {
 	if len(related) == 0 {
 		return nil
 	}
 
 	var err error
-	posts1 := PostSlice(related)
+	todos1 := TodoSlice(related)
 
-	_, err = attachUserPosts0(ctx, exec, len(related), posts1, user0)
+	_, err = attachUserTodos0(ctx, exec, len(related), todos1, user0)
 	if err != nil {
 		return err
 	}
 
-	user0.R.Posts = append(user0.R.Posts, posts1...)
+	user0.R.Todos = append(user0.R.Todos, todos1...)
 
 	for _, rel := range related {
 		rel.R.User = user0

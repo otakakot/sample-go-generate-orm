@@ -34,45 +34,15 @@ func main() {
 	ctx := context.Background()
 
 	// 事前データ準備
-	if _, err := db.QueryContext(ctx, "TRUNCATE TABLE users, posts CASCADE"); err != nil {
+	if _, err := db.QueryContext(ctx, "TRUNCATE TABLE users CASCADE"); err != nil {
 		panic(err)
 	}
 
-	tmpUser1 := models.User{
-		Name: uuid.NewString(),
+	tmp := models.User{
+		Name: "name",
 	}
 
-	if err := tmpUser1.Insert(ctx, db, boil.Infer()); err != nil {
-		panic(err)
-	}
-
-	tmpPost1 := models.Post{
-		UserID:  tmpUser1.ID,
-		Title:   "1",
-		Content: "1",
-	}
-
-	if err := tmpPost1.Insert(ctx, db, boil.Infer()); err != nil {
-		panic(err)
-	}
-
-	tmpPost2 := models.Post{
-		UserID:  tmpUser1.ID,
-		Title:   "2",
-		Content: "2",
-	}
-
-	if err := tmpPost2.Insert(ctx, db, boil.Infer()); err != nil {
-		panic(err)
-	}
-
-	tmpPost3 := models.Post{
-		UserID:  tmpUser1.ID,
-		Title:   "3",
-		Content: "3",
-	}
-
-	if err := tmpPost3.Insert(ctx, db, boil.Infer()); err != nil {
+	if err := tmp.Insert(ctx, db, boil.Infer()); err != nil {
 		panic(err)
 	}
 
@@ -87,22 +57,22 @@ func main() {
 	}
 
 	// SELECT WHERE
-	got, err := models.FindUser(ctx, db, tmpUser1.ID)
+	got, err := models.FindUser(ctx, db, tmp.ID)
 	if err != nil {
 		panic(err)
 	}
 
 	slog.Info(fmt.Sprintf("user: %+v", got))
 
-	posts, err := models.Posts(
-		models.PostWhere.UserID.EQ(got.ID),
+	users, err := models.Users(
+		models.UserWhere.Name.EQ("name"),
 	).All(ctx, db)
 	if err != nil {
 		panic(err)
 	}
 
-	for _, post := range posts {
-		slog.Info(fmt.Sprintf("post: %+v", post))
+	for _, user := range users {
+		slog.Info(fmt.Sprintf("user: %+v", user))
 	}
 
 	// INSERT
@@ -203,12 +173,12 @@ func main() {
 		panic(err)
 	}
 
-	users, err := models.Users().All(ctx, db)
+	all, err := models.Users().All(ctx, db)
 	if err != nil {
 		panic(err)
 	}
 
-	for _, user := range users {
+	for _, user := range all {
 		slog.Info(fmt.Sprintf("user: %+v", user))
 	}
 }

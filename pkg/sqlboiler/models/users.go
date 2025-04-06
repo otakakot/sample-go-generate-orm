@@ -72,14 +72,14 @@ var UserWhere = struct {
 
 // UserRels is where relationship names are stored.
 var UserRels = struct {
-	Posts string
+	Todos string
 }{
-	Posts: "Posts",
+	Todos: "Todos",
 }
 
 // userR is where relationships are stored.
 type userR struct {
-	Posts PostSlice `boil:"Posts" json:"Posts" toml:"Posts" yaml:"Posts"`
+	Todos TodoSlice `boil:"Todos" json:"Todos" toml:"Todos" yaml:"Todos"`
 }
 
 // NewStruct creates a new relationship struct
@@ -87,11 +87,11 @@ func (*userR) NewStruct() *userR {
 	return &userR{}
 }
 
-func (r *userR) GetPosts() PostSlice {
+func (r *userR) GetTodos() TodoSlice {
 	if r == nil {
 		return nil
 	}
-	return r.Posts
+	return r.Todos
 }
 
 // userL is where Load methods for each relationship are stored.
@@ -410,23 +410,23 @@ func (q userQuery) Exists(ctx context.Context, exec boil.ContextExecutor) (bool,
 	return count > 0, nil
 }
 
-// Posts retrieves all the post's Posts with an executor.
-func (o *User) Posts(mods ...qm.QueryMod) postQuery {
+// Todos retrieves all the todo's Todos with an executor.
+func (o *User) Todos(mods ...qm.QueryMod) todoQuery {
 	var queryMods []qm.QueryMod
 	if len(mods) != 0 {
 		queryMods = append(queryMods, mods...)
 	}
 
 	queryMods = append(queryMods,
-		qm.Where("\"posts\".\"user_id\"=?", o.ID),
+		qm.Where("\"todos\".\"user_id\"=?", o.ID),
 	)
 
-	return Posts(queryMods...)
+	return Todos(queryMods...)
 }
 
-// LoadPosts allows an eager lookup of values, cached into the
+// LoadTodos allows an eager lookup of values, cached into the
 // loaded structs of the objects. This is for a 1-M or N-M relationship.
-func (userL) LoadPosts(ctx context.Context, e boil.ContextExecutor, singular bool, maybeUser interface{}, mods queries.Applicator) error {
+func (userL) LoadTodos(ctx context.Context, e boil.ContextExecutor, singular bool, maybeUser interface{}, mods queries.Applicator) error {
 	var slice []*User
 	var object *User
 
@@ -479,8 +479,8 @@ func (userL) LoadPosts(ctx context.Context, e boil.ContextExecutor, singular boo
 	}
 
 	query := NewQuery(
-		qm.From(`posts`),
-		qm.WhereIn(`posts.user_id in ?`, argsSlice...),
+		qm.From(`todos`),
+		qm.WhereIn(`todos.user_id in ?`, argsSlice...),
 	)
 	if mods != nil {
 		mods.Apply(query)
@@ -488,22 +488,22 @@ func (userL) LoadPosts(ctx context.Context, e boil.ContextExecutor, singular boo
 
 	results, err := query.QueryContext(ctx, e)
 	if err != nil {
-		return errors.Wrap(err, "failed to eager load posts")
+		return errors.Wrap(err, "failed to eager load todos")
 	}
 
-	var resultSlice []*Post
+	var resultSlice []*Todo
 	if err = queries.Bind(results, &resultSlice); err != nil {
-		return errors.Wrap(err, "failed to bind eager loaded slice posts")
+		return errors.Wrap(err, "failed to bind eager loaded slice todos")
 	}
 
 	if err = results.Close(); err != nil {
-		return errors.Wrap(err, "failed to close results in eager load on posts")
+		return errors.Wrap(err, "failed to close results in eager load on todos")
 	}
 	if err = results.Err(); err != nil {
-		return errors.Wrap(err, "error occurred during iteration of eager loaded relations for posts")
+		return errors.Wrap(err, "error occurred during iteration of eager loaded relations for todos")
 	}
 
-	if len(postAfterSelectHooks) != 0 {
+	if len(todoAfterSelectHooks) != 0 {
 		for _, obj := range resultSlice {
 			if err := obj.doAfterSelectHooks(ctx, e); err != nil {
 				return err
@@ -511,10 +511,10 @@ func (userL) LoadPosts(ctx context.Context, e boil.ContextExecutor, singular boo
 		}
 	}
 	if singular {
-		object.R.Posts = resultSlice
+		object.R.Todos = resultSlice
 		for _, foreign := range resultSlice {
 			if foreign.R == nil {
-				foreign.R = &postR{}
+				foreign.R = &todoR{}
 			}
 			foreign.R.User = object
 		}
@@ -524,9 +524,9 @@ func (userL) LoadPosts(ctx context.Context, e boil.ContextExecutor, singular boo
 	for _, foreign := range resultSlice {
 		for _, local := range slice {
 			if local.ID == foreign.UserID {
-				local.R.Posts = append(local.R.Posts, foreign)
+				local.R.Todos = append(local.R.Todos, foreign)
 				if foreign.R == nil {
-					foreign.R = &postR{}
+					foreign.R = &todoR{}
 				}
 				foreign.R.User = local
 				break
@@ -537,11 +537,11 @@ func (userL) LoadPosts(ctx context.Context, e boil.ContextExecutor, singular boo
 	return nil
 }
 
-// AddPosts adds the given related objects to the existing relationships
+// AddTodos adds the given related objects to the existing relationships
 // of the user, optionally inserting them as new records.
-// Appends related to o.R.Posts.
+// Appends related to o.R.Todos.
 // Sets related.R.User appropriately.
-func (o *User) AddPosts(ctx context.Context, exec boil.ContextExecutor, insert bool, related ...*Post) error {
+func (o *User) AddTodos(ctx context.Context, exec boil.ContextExecutor, insert bool, related ...*Todo) error {
 	var err error
 	for _, rel := range related {
 		if insert {
@@ -551,9 +551,9 @@ func (o *User) AddPosts(ctx context.Context, exec boil.ContextExecutor, insert b
 			}
 		} else {
 			updateQuery := fmt.Sprintf(
-				"UPDATE \"posts\" SET %s WHERE %s",
+				"UPDATE \"todos\" SET %s WHERE %s",
 				strmangle.SetParamNames("\"", "\"", 1, []string{"user_id"}),
-				strmangle.WhereClause("\"", "\"", 2, postPrimaryKeyColumns),
+				strmangle.WhereClause("\"", "\"", 2, todoPrimaryKeyColumns),
 			)
 			values := []interface{}{o.ID, rel.ID}
 
@@ -572,15 +572,15 @@ func (o *User) AddPosts(ctx context.Context, exec boil.ContextExecutor, insert b
 
 	if o.R == nil {
 		o.R = &userR{
-			Posts: related,
+			Todos: related,
 		}
 	} else {
-		o.R.Posts = append(o.R.Posts, related...)
+		o.R.Todos = append(o.R.Todos, related...)
 	}
 
 	for _, rel := range related {
 		if rel.R == nil {
-			rel.R = &postR{
+			rel.R = &todoR{
 				User: o,
 			}
 		} else {

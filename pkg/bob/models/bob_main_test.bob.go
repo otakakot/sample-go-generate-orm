@@ -11,8 +11,8 @@ import (
 	"github.com/stephenafamo/bob"
 )
 
-// Make sure the type Post runs hooks after queries
-var _ bob.HookableType = &Post{}
+// Make sure the type Todo runs hooks after queries
+var _ bob.HookableType = &Todo{}
 
 // Make sure the type User runs hooks after queries
 var _ bob.HookableType = &User{}

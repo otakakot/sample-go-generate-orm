@@ -14,18 +14,18 @@ import (
 )
 
 var TableNames = struct {
-	Posts string
+	Todos string
 	Users string
 }{
-	Posts: "posts",
+	Todos: "todos",
 	Users: "users",
 }
 
 var ColumnNames = struct {
-	Posts postColumnNames
+	Todos todoColumnNames
 	Users userColumnNames
 }{
-	Posts: postColumnNames{
+	Todos: todoColumnNames{
 		ID:        "id",
 		UserID:    "user_id",
 		Title:     "title",
@@ -49,14 +49,14 @@ var (
 )
 
 func Where[Q psql.Filterable]() struct {
-	Posts postWhere[Q]
+	Todos todoWhere[Q]
 	Users userWhere[Q]
 } {
 	return struct {
-		Posts postWhere[Q]
+		Todos todoWhere[Q]
 		Users userWhere[Q]
 	}{
-		Posts: buildPostWhere[Q](PostColumns),
+		Todos: buildTodoWhere[Q](TodoColumns),
 		Users: buildUserWhere[Q](UserColumns),
 	}
 }
@@ -82,7 +82,7 @@ func (j joinSet[Q]) AliasedAs(alias string) joinSet[Q] {
 }
 
 type joins[Q dialect.Joinable] struct {
-	Posts joinSet[postJoins[Q]]
+	Todos joinSet[todoJoins[Q]]
 	Users joinSet[userJoins[Q]]
 }
 
@@ -96,7 +96,7 @@ func buildJoinSet[Q interface{ aliasedAs(string) Q }, C any, F func(C, string) Q
 
 func getJoins[Q dialect.Joinable]() joins[Q] {
 	return joins[Q]{
-		Posts: buildJoinSet[postJoins[Q]](PostColumns, buildPostJoins),
+		Todos: buildJoinSet[todoJoins[Q]](TodoColumns, buildTodoJoins),
 		Users: buildJoinSet[userJoins[Q]](UserColumns, buildUserJoins),
 	}
 }

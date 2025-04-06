@@ -24,8 +24,8 @@ import (
 	"github.com/stephenafamo/bob/orm"
 )
 
-// Post is an object representing the database table.
-type Post struct {
+// Todo is an object representing the database table.
+type Todo struct {
 	ID        uuid.UUID `db:"id,pk" `
 	UserID    uuid.UUID `db:"user_id" `
 	Title     string    `db:"title" `
@@ -33,25 +33,25 @@ type Post struct {
 	CreatedAt time.Time `db:"created_at" `
 	UpdatedAt time.Time `db:"updated_at" `
 
-	R postR `db:"-" `
+	R todoR `db:"-" `
 }
 
-// PostSlice is an alias for a slice of pointers to Post.
-// This should almost always be used instead of []*Post.
-type PostSlice []*Post
+// TodoSlice is an alias for a slice of pointers to Todo.
+// This should almost always be used instead of []*Todo.
+type TodoSlice []*Todo
 
-// Posts contains methods to work with the posts table
-var Posts = psql.NewTablex[*Post, PostSlice, *PostSetter]("", "posts")
+// Todos contains methods to work with the todos table
+var Todos = psql.NewTablex[*Todo, TodoSlice, *TodoSetter]("", "todos")
 
-// PostsQuery is a query on the posts table
-type PostsQuery = *psql.ViewQuery[*Post, PostSlice]
+// TodosQuery is a query on the todos table
+type TodosQuery = *psql.ViewQuery[*Todo, TodoSlice]
 
-// postR is where relationships are stored.
-type postR struct {
-	User *User // posts.posts_user_id_fkey
+// todoR is where relationships are stored.
+type todoR struct {
+	User *User // todos.todos_user_id_fkey
 }
 
-type postColumnNames struct {
+type todoColumnNames struct {
 	ID        string
 	UserID    string
 	Title     string
@@ -60,9 +60,9 @@ type postColumnNames struct {
 	UpdatedAt string
 }
 
-var PostColumns = buildPostColumns("posts")
+var TodoColumns = buildTodoColumns("todos")
 
-type postColumns struct {
+type todoColumns struct {
 	tableAlias string
 	ID         psql.Expression
 	UserID     psql.Expression
@@ -72,16 +72,16 @@ type postColumns struct {
 	UpdatedAt  psql.Expression
 }
 
-func (c postColumns) Alias() string {
+func (c todoColumns) Alias() string {
 	return c.tableAlias
 }
 
-func (postColumns) AliasedAs(alias string) postColumns {
-	return buildPostColumns(alias)
+func (todoColumns) AliasedAs(alias string) todoColumns {
+	return buildTodoColumns(alias)
 }
 
-func buildPostColumns(alias string) postColumns {
-	return postColumns{
+func buildTodoColumns(alias string) todoColumns {
+	return todoColumns{
 		tableAlias: alias,
 		ID:         psql.Quote(alias, "id"),
 		UserID:     psql.Quote(alias, "user_id"),
@@ -92,7 +92,7 @@ func buildPostColumns(alias string) postColumns {
 	}
 }
 
-type postWhere[Q psql.Filterable] struct {
+type todoWhere[Q psql.Filterable] struct {
 	ID        psql.WhereMod[Q, uuid.UUID]
 	UserID    psql.WhereMod[Q, uuid.UUID]
 	Title     psql.WhereMod[Q, string]
@@ -101,12 +101,12 @@ type postWhere[Q psql.Filterable] struct {
 	UpdatedAt psql.WhereMod[Q, time.Time]
 }
 
-func (postWhere[Q]) AliasedAs(alias string) postWhere[Q] {
-	return buildPostWhere[Q](buildPostColumns(alias))
+func (todoWhere[Q]) AliasedAs(alias string) todoWhere[Q] {
+	return buildTodoWhere[Q](buildTodoColumns(alias))
 }
 
-func buildPostWhere[Q psql.Filterable](cols postColumns) postWhere[Q] {
-	return postWhere[Q]{
+func buildTodoWhere[Q psql.Filterable](cols todoColumns) todoWhere[Q] {
+	return todoWhere[Q]{
 		ID:        psql.Where[Q, uuid.UUID](cols.ID),
 		UserID:    psql.Where[Q, uuid.UUID](cols.UserID),
 		Title:     psql.Where[Q, string](cols.Title),
@@ -116,18 +116,18 @@ func buildPostWhere[Q psql.Filterable](cols postColumns) postWhere[Q] {
 	}
 }
 
-var PostErrors = &postErrors{
-	ErrUniquePostsPkey: &UniqueConstraintError{s: "posts_pkey"},
+var TodoErrors = &todoErrors{
+	ErrUniqueTodosPkey: &UniqueConstraintError{s: "todos_pkey"},
 }
 
-type postErrors struct {
-	ErrUniquePostsPkey *UniqueConstraintError
+type todoErrors struct {
+	ErrUniqueTodosPkey *UniqueConstraintError
 }
 
-// PostSetter is used for insert/upsert/update operations
+// TodoSetter is used for insert/upsert/update operations
 // All values are optional, and do not have to be set
 // Generated columns are not included
-type PostSetter struct {
+type TodoSetter struct {
 	ID        omit.Val[uuid.UUID] `db:"id,pk" `
 	UserID    omit.Val[uuid.UUID] `db:"user_id" `
 	Title     omit.Val[string]    `db:"title" `
@@ -136,7 +136,7 @@ type PostSetter struct {
 	UpdatedAt omit.Val[time.Time] `db:"updated_at" `
 }
 
-func (s PostSetter) SetColumns() []string {
+func (s TodoSetter) SetColumns() []string {
 	vals := make([]string, 0, 6)
 	if !s.ID.IsUnset() {
 		vals = append(vals, "id")
@@ -165,7 +165,7 @@ func (s PostSetter) SetColumns() []string {
 	return vals
 }
 
-func (s PostSetter) Overwrite(t *Post) {
+func (s TodoSetter) Overwrite(t *Todo) {
 	if !s.ID.IsUnset() {
 		t.ID, _ = s.ID.Get()
 	}
@@ -186,9 +186,9 @@ func (s PostSetter) Overwrite(t *Post) {
 	}
 }
 
-func (s *PostSetter) Apply(q *dialect.InsertQuery) {
+func (s *TodoSetter) Apply(q *dialect.InsertQuery) {
 	q.AppendHooks(func(ctx context.Context, exec bob.Executor) (context.Context, error) {
-		return Posts.BeforeInsertHooks.RunHooks(ctx, exec, s)
+		return Todos.BeforeInsertHooks.RunHooks(ctx, exec, s)
 	})
 
 	q.AppendValues(bob.ExpressionFunc(func(ctx context.Context, w io.Writer, d bob.Dialect, start int) ([]any, error) {
@@ -233,11 +233,11 @@ func (s *PostSetter) Apply(q *dialect.InsertQuery) {
 	}))
 }
 
-func (s PostSetter) UpdateMod() bob.Mod[*dialect.UpdateQuery] {
+func (s TodoSetter) UpdateMod() bob.Mod[*dialect.UpdateQuery] {
 	return um.Set(s.Expressions()...)
 }
 
-func (s PostSetter) Expressions(prefix ...string) []bob.Expression {
+func (s TodoSetter) Expressions(prefix ...string) []bob.Expression {
 	exprs := make([]bob.Expression, 0, 6)
 
 	if !s.ID.IsUnset() {
@@ -285,60 +285,60 @@ func (s PostSetter) Expressions(prefix ...string) []bob.Expression {
 	return exprs
 }
 
-// FindPost retrieves a single record by primary key
+// FindTodo retrieves a single record by primary key
 // If cols is empty Find will return all columns.
-func FindPost(ctx context.Context, exec bob.Executor, IDPK uuid.UUID, cols ...string) (*Post, error) {
+func FindTodo(ctx context.Context, exec bob.Executor, IDPK uuid.UUID, cols ...string) (*Todo, error) {
 	if len(cols) == 0 {
-		return Posts.Query(
-			SelectWhere.Posts.ID.EQ(IDPK),
+		return Todos.Query(
+			SelectWhere.Todos.ID.EQ(IDPK),
 		).One(ctx, exec)
 	}
 
-	return Posts.Query(
-		SelectWhere.Posts.ID.EQ(IDPK),
-		sm.Columns(Posts.Columns().Only(cols...)),
+	return Todos.Query(
+		SelectWhere.Todos.ID.EQ(IDPK),
+		sm.Columns(Todos.Columns().Only(cols...)),
 	).One(ctx, exec)
 }
 
-// PostExists checks the presence of a single record by primary key
-func PostExists(ctx context.Context, exec bob.Executor, IDPK uuid.UUID) (bool, error) {
-	return Posts.Query(
-		SelectWhere.Posts.ID.EQ(IDPK),
+// TodoExists checks the presence of a single record by primary key
+func TodoExists(ctx context.Context, exec bob.Executor, IDPK uuid.UUID) (bool, error) {
+	return Todos.Query(
+		SelectWhere.Todos.ID.EQ(IDPK),
 	).Exists(ctx, exec)
 }
 
-// AfterQueryHook is called after Post is retrieved from the database
-func (o *Post) AfterQueryHook(ctx context.Context, exec bob.Executor, queryType bob.QueryType) error {
+// AfterQueryHook is called after Todo is retrieved from the database
+func (o *Todo) AfterQueryHook(ctx context.Context, exec bob.Executor, queryType bob.QueryType) error {
 	var err error
 
 	switch queryType {
 	case bob.QueryTypeSelect:
-		ctx, err = Posts.AfterSelectHooks.RunHooks(ctx, exec, PostSlice{o})
+		ctx, err = Todos.AfterSelectHooks.RunHooks(ctx, exec, TodoSlice{o})
 	case bob.QueryTypeInsert:
-		ctx, err = Posts.AfterInsertHooks.RunHooks(ctx, exec, PostSlice{o})
+		ctx, err = Todos.AfterInsertHooks.RunHooks(ctx, exec, TodoSlice{o})
 	case bob.QueryTypeUpdate:
-		ctx, err = Posts.AfterUpdateHooks.RunHooks(ctx, exec, PostSlice{o})
+		ctx, err = Todos.AfterUpdateHooks.RunHooks(ctx, exec, TodoSlice{o})
 	case bob.QueryTypeDelete:
-		ctx, err = Posts.AfterDeleteHooks.RunHooks(ctx, exec, PostSlice{o})
+		ctx, err = Todos.AfterDeleteHooks.RunHooks(ctx, exec, TodoSlice{o})
 	}
 
 	return err
 }
 
-// PrimaryKeyVals returns the primary key values of the Post
-func (o *Post) PrimaryKeyVals() bob.Expression {
+// PrimaryKeyVals returns the primary key values of the Todo
+func (o *Todo) PrimaryKeyVals() bob.Expression {
 	return psql.Arg(o.ID)
 }
 
-func (o *Post) pkEQ() dialect.Expression {
-	return psql.Quote("posts", "id").EQ(bob.ExpressionFunc(func(ctx context.Context, w io.Writer, d bob.Dialect, start int) ([]any, error) {
+func (o *Todo) pkEQ() dialect.Expression {
+	return psql.Quote("todos", "id").EQ(bob.ExpressionFunc(func(ctx context.Context, w io.Writer, d bob.Dialect, start int) ([]any, error) {
 		return o.PrimaryKeyVals().WriteSQL(ctx, w, d, start)
 	}))
 }
 
-// Update uses an executor to update the Post
-func (o *Post) Update(ctx context.Context, exec bob.Executor, s *PostSetter) error {
-	v, err := Posts.Update(s.UpdateMod(), um.Where(o.pkEQ())).One(ctx, exec)
+// Update uses an executor to update the Todo
+func (o *Todo) Update(ctx context.Context, exec bob.Executor, s *TodoSetter) error {
+	v, err := Todos.Update(s.UpdateMod(), um.Where(o.pkEQ())).One(ctx, exec)
 	if err != nil {
 		return err
 	}
@@ -349,16 +349,16 @@ func (o *Post) Update(ctx context.Context, exec bob.Executor, s *PostSetter) err
 	return nil
 }
 
-// Delete deletes a single Post record with an executor
-func (o *Post) Delete(ctx context.Context, exec bob.Executor) error {
-	_, err := Posts.Delete(dm.Where(o.pkEQ())).Exec(ctx, exec)
+// Delete deletes a single Todo record with an executor
+func (o *Todo) Delete(ctx context.Context, exec bob.Executor) error {
+	_, err := Todos.Delete(dm.Where(o.pkEQ())).Exec(ctx, exec)
 	return err
 }
 
-// Reload refreshes the Post using the executor
-func (o *Post) Reload(ctx context.Context, exec bob.Executor) error {
-	o2, err := Posts.Query(
-		SelectWhere.Posts.ID.EQ(o.ID),
+// Reload refreshes the Todo using the executor
+func (o *Todo) Reload(ctx context.Context, exec bob.Executor) error {
+	o2, err := Todos.Query(
+		SelectWhere.Todos.ID.EQ(o.ID),
 	).One(ctx, exec)
 	if err != nil {
 		return err
@@ -369,30 +369,30 @@ func (o *Post) Reload(ctx context.Context, exec bob.Executor) error {
 	return nil
 }
 
-// AfterQueryHook is called after PostSlice is retrieved from the database
-func (o PostSlice) AfterQueryHook(ctx context.Context, exec bob.Executor, queryType bob.QueryType) error {
+// AfterQueryHook is called after TodoSlice is retrieved from the database
+func (o TodoSlice) AfterQueryHook(ctx context.Context, exec bob.Executor, queryType bob.QueryType) error {
 	var err error
 
 	switch queryType {
 	case bob.QueryTypeSelect:
-		ctx, err = Posts.AfterSelectHooks.RunHooks(ctx, exec, o)
+		ctx, err = Todos.AfterSelectHooks.RunHooks(ctx, exec, o)
 	case bob.QueryTypeInsert:
-		ctx, err = Posts.AfterInsertHooks.RunHooks(ctx, exec, o)
+		ctx, err = Todos.AfterInsertHooks.RunHooks(ctx, exec, o)
 	case bob.QueryTypeUpdate:
-		ctx, err = Posts.AfterUpdateHooks.RunHooks(ctx, exec, o)
+		ctx, err = Todos.AfterUpdateHooks.RunHooks(ctx, exec, o)
 	case bob.QueryTypeDelete:
-		ctx, err = Posts.AfterDeleteHooks.RunHooks(ctx, exec, o)
+		ctx, err = Todos.AfterDeleteHooks.RunHooks(ctx, exec, o)
 	}
 
 	return err
 }
 
-func (o PostSlice) pkIN() dialect.Expression {
+func (o TodoSlice) pkIN() dialect.Expression {
 	if len(o) == 0 {
 		return psql.Raw("NULL")
 	}
 
-	return psql.Quote("posts", "id").In(bob.ExpressionFunc(func(ctx context.Context, w io.Writer, d bob.Dialect, start int) ([]any, error) {
+	return psql.Quote("todos", "id").In(bob.ExpressionFunc(func(ctx context.Context, w io.Writer, d bob.Dialect, start int) ([]any, error) {
 		pkPairs := make([]bob.Expression, len(o))
 		for i, row := range o {
 			pkPairs[i] = row.PrimaryKeyVals()
@@ -404,7 +404,7 @@ func (o PostSlice) pkIN() dialect.Expression {
 // copyMatchingRows finds models in the given slice that have the same primary key
 // then it first copies the existing relationships from the old model to the new model
 // and then replaces the old model in the slice with the new model
-func (o PostSlice) copyMatchingRows(from ...*Post) {
+func (o TodoSlice) copyMatchingRows(from ...*Todo) {
 	for i, old := range o {
 		for _, new := range from {
 			if new.ID != old.ID {
@@ -418,25 +418,25 @@ func (o PostSlice) copyMatchingRows(from ...*Post) {
 }
 
 // UpdateMod modifies an update query with "WHERE primary_key IN (o...)"
-func (o PostSlice) UpdateMod() bob.Mod[*dialect.UpdateQuery] {
+func (o TodoSlice) UpdateMod() bob.Mod[*dialect.UpdateQuery] {
 	return bob.ModFunc[*dialect.UpdateQuery](func(q *dialect.UpdateQuery) {
 		q.AppendHooks(func(ctx context.Context, exec bob.Executor) (context.Context, error) {
-			return Posts.BeforeUpdateHooks.RunHooks(ctx, exec, o)
+			return Todos.BeforeUpdateHooks.RunHooks(ctx, exec, o)
 		})
 
 		q.AppendLoader(bob.LoaderFunc(func(ctx context.Context, exec bob.Executor, retrieved any) error {
 			var err error
 			switch retrieved := retrieved.(type) {
-			case *Post:
+			case *Todo:
 				o.copyMatchingRows(retrieved)
-			case []*Post:
+			case []*Todo:
 				o.copyMatchingRows(retrieved...)
-			case PostSlice:
+			case TodoSlice:
 				o.copyMatchingRows(retrieved...)
 			default:
-				// If the retrieved value is not a Post or a slice of Post
+				// If the retrieved value is not a Todo or a slice of Todo
 				// then run the AfterUpdateHooks on the slice
-				_, err = Posts.AfterUpdateHooks.RunHooks(ctx, exec, o)
+				_, err = Todos.AfterUpdateHooks.RunHooks(ctx, exec, o)
 			}
 
 			return err
@@ -447,25 +447,25 @@ func (o PostSlice) UpdateMod() bob.Mod[*dialect.UpdateQuery] {
 }
 
 // DeleteMod modifies an delete query with "WHERE primary_key IN (o...)"
-func (o PostSlice) DeleteMod() bob.Mod[*dialect.DeleteQuery] {
+func (o TodoSlice) DeleteMod() bob.Mod[*dialect.DeleteQuery] {
 	return bob.ModFunc[*dialect.DeleteQuery](func(q *dialect.DeleteQuery) {
 		q.AppendHooks(func(ctx context.Context, exec bob.Executor) (context.Context, error) {
-			return Posts.BeforeDeleteHooks.RunHooks(ctx, exec, o)
+			return Todos.BeforeDeleteHooks.RunHooks(ctx, exec, o)
 		})
 
 		q.AppendLoader(bob.LoaderFunc(func(ctx context.Context, exec bob.Executor, retrieved any) error {
 			var err error
 			switch retrieved := retrieved.(type) {
-			case *Post:
+			case *Todo:
 				o.copyMatchingRows(retrieved)
-			case []*Post:
+			case []*Todo:
 				o.copyMatchingRows(retrieved...)
-			case PostSlice:
+			case TodoSlice:
 				o.copyMatchingRows(retrieved...)
 			default:
-				// If the retrieved value is not a Post or a slice of Post
+				// If the retrieved value is not a Todo or a slice of Todo
 				// then run the AfterDeleteHooks on the slice
-				_, err = Posts.AfterDeleteHooks.RunHooks(ctx, exec, o)
+				_, err = Todos.AfterDeleteHooks.RunHooks(ctx, exec, o)
 			}
 
 			return err
@@ -475,30 +475,30 @@ func (o PostSlice) DeleteMod() bob.Mod[*dialect.DeleteQuery] {
 	})
 }
 
-func (o PostSlice) UpdateAll(ctx context.Context, exec bob.Executor, vals PostSetter) error {
+func (o TodoSlice) UpdateAll(ctx context.Context, exec bob.Executor, vals TodoSetter) error {
 	if len(o) == 0 {
 		return nil
 	}
 
-	_, err := Posts.Update(vals.UpdateMod(), o.UpdateMod()).All(ctx, exec)
+	_, err := Todos.Update(vals.UpdateMod(), o.UpdateMod()).All(ctx, exec)
 	return err
 }
 
-func (o PostSlice) DeleteAll(ctx context.Context, exec bob.Executor) error {
+func (o TodoSlice) DeleteAll(ctx context.Context, exec bob.Executor) error {
 	if len(o) == 0 {
 		return nil
 	}
 
-	_, err := Posts.Delete(o.DeleteMod()).Exec(ctx, exec)
+	_, err := Todos.Delete(o.DeleteMod()).Exec(ctx, exec)
 	return err
 }
 
-func (o PostSlice) ReloadAll(ctx context.Context, exec bob.Executor) error {
+func (o TodoSlice) ReloadAll(ctx context.Context, exec bob.Executor) error {
 	if len(o) == 0 {
 		return nil
 	}
 
-	o2, err := Posts.Query(sm.Where(o.pkIN())).All(ctx, exec)
+	o2, err := Todos.Query(sm.Where(o.pkIN())).All(ctx, exec)
 	if err != nil {
 		return err
 	}
@@ -508,23 +508,23 @@ func (o PostSlice) ReloadAll(ctx context.Context, exec bob.Executor) error {
 	return nil
 }
 
-type postJoins[Q dialect.Joinable] struct {
+type todoJoins[Q dialect.Joinable] struct {
 	typ  string
 	User func(context.Context) modAs[Q, userColumns]
 }
 
-func (j postJoins[Q]) aliasedAs(alias string) postJoins[Q] {
-	return buildPostJoins[Q](buildPostColumns(alias), j.typ)
+func (j todoJoins[Q]) aliasedAs(alias string) todoJoins[Q] {
+	return buildTodoJoins[Q](buildTodoColumns(alias), j.typ)
 }
 
-func buildPostJoins[Q dialect.Joinable](cols postColumns, typ string) postJoins[Q] {
-	return postJoins[Q]{
+func buildTodoJoins[Q dialect.Joinable](cols todoColumns, typ string) todoJoins[Q] {
+	return todoJoins[Q]{
 		typ:  typ,
-		User: postsJoinUser[Q](cols, typ),
+		User: todosJoinUser[Q](cols, typ),
 	}
 }
 
-func postsJoinUser[Q dialect.Joinable](from postColumns, typ string) func(context.Context) modAs[Q, userColumns] {
+func todosJoinUser[Q dialect.Joinable](from todoColumns, typ string) func(context.Context) modAs[Q, userColumns] {
 	return func(ctx context.Context) modAs[Q, userColumns] {
 		return modAs[Q, userColumns]{
 			c: UserColumns,
@@ -544,13 +544,13 @@ func postsJoinUser[Q dialect.Joinable](from postColumns, typ string) func(contex
 }
 
 // User starts a query for related objects on users
-func (o *Post) User(mods ...bob.Mod[*dialect.SelectQuery]) UsersQuery {
+func (o *Todo) User(mods ...bob.Mod[*dialect.SelectQuery]) UsersQuery {
 	return Users.Query(append(mods,
 		sm.Where(UserColumns.ID.EQ(psql.Arg(o.UserID))),
 	)...)
 }
 
-func (os PostSlice) User(mods ...bob.Mod[*dialect.SelectQuery]) UsersQuery {
+func (os TodoSlice) User(mods ...bob.Mod[*dialect.SelectQuery]) UsersQuery {
 	PKArgs := make([]bob.Expression, len(os))
 	for i, o := range os {
 		PKArgs[i] = psql.ArgGroup(o.UserID)
@@ -561,7 +561,7 @@ func (os PostSlice) User(mods ...bob.Mod[*dialect.SelectQuery]) UsersQuery {
 	)...)
 }
 
-func (o *Post) Preload(name string, retrieved any) error {
+func (o *Todo) Preload(name string, retrieved any) error {
 	if o == nil {
 		return nil
 	}
@@ -570,29 +570,29 @@ func (o *Post) Preload(name string, retrieved any) error {
 	case "User":
 		rel, ok := retrieved.(*User)
 		if !ok {
-			return fmt.Errorf("post cannot load %T as %q", retrieved, name)
+			return fmt.Errorf("todo cannot load %T as %q", retrieved, name)
 		}
 
 		o.R.User = rel
 
 		if rel != nil {
-			rel.R.Posts = PostSlice{o}
+			rel.R.Todos = TodoSlice{o}
 		}
 		return nil
 	default:
-		return fmt.Errorf("post has no relationship %q", name)
+		return fmt.Errorf("todo has no relationship %q", name)
 	}
 }
 
-func PreloadPostUser(opts ...psql.PreloadOption) psql.Preloader {
+func PreloadTodoUser(opts ...psql.PreloadOption) psql.Preloader {
 	return psql.Preload[*User, UserSlice](orm.Relationship{
 		Name: "User",
 		Sides: []orm.RelSide{
 			{
-				From: TableNames.Posts,
+				From: TableNames.Todos,
 				To:   TableNames.Users,
 				FromColumns: []string{
-					ColumnNames.Posts.UserID,
+					ColumnNames.Todos.UserID,
 				},
 				ToColumns: []string{
 					ColumnNames.Users.ID,
@@ -602,16 +602,16 @@ func PreloadPostUser(opts ...psql.PreloadOption) psql.Preloader {
 	}, Users.Columns().Names(), opts...)
 }
 
-func ThenLoadPostUser(queryMods ...bob.Mod[*dialect.SelectQuery]) psql.Loader {
+func ThenLoadTodoUser(queryMods ...bob.Mod[*dialect.SelectQuery]) psql.Loader {
 	return psql.Loader(func(ctx context.Context, exec bob.Executor, retrieved any) error {
 		loader, isLoader := retrieved.(interface {
-			LoadPostUser(context.Context, bob.Executor, ...bob.Mod[*dialect.SelectQuery]) error
+			LoadTodoUser(context.Context, bob.Executor, ...bob.Mod[*dialect.SelectQuery]) error
 		})
 		if !isLoader {
-			return fmt.Errorf("object %T cannot load PostUser", retrieved)
+			return fmt.Errorf("object %T cannot load TodoUser", retrieved)
 		}
 
-		err := loader.LoadPostUser(ctx, exec, queryMods...)
+		err := loader.LoadTodoUser(ctx, exec, queryMods...)
 
 		// Don't cause an issue due to missing relationships
 		if errors.Is(err, sql.ErrNoRows) {
@@ -622,8 +622,8 @@ func ThenLoadPostUser(queryMods ...bob.Mod[*dialect.SelectQuery]) psql.Loader {
 	})
 }
 
-// LoadPostUser loads the post's User into the .R struct
-func (o *Post) LoadPostUser(ctx context.Context, exec bob.Executor, mods ...bob.Mod[*dialect.SelectQuery]) error {
+// LoadTodoUser loads the todo's User into the .R struct
+func (o *Todo) LoadTodoUser(ctx context.Context, exec bob.Executor, mods ...bob.Mod[*dialect.SelectQuery]) error {
 	if o == nil {
 		return nil
 	}
@@ -636,14 +636,14 @@ func (o *Post) LoadPostUser(ctx context.Context, exec bob.Executor, mods ...bob.
 		return err
 	}
 
-	related.R.Posts = PostSlice{o}
+	related.R.Todos = TodoSlice{o}
 
 	o.R.User = related
 	return nil
 }
 
-// LoadPostUser loads the post's User into the .R struct
-func (os PostSlice) LoadPostUser(ctx context.Context, exec bob.Executor, mods ...bob.Mod[*dialect.SelectQuery]) error {
+// LoadTodoUser loads the todo's User into the .R struct
+func (os TodoSlice) LoadTodoUser(ctx context.Context, exec bob.Executor, mods ...bob.Mod[*dialect.SelectQuery]) error {
 	if len(os) == 0 {
 		return nil
 	}
@@ -659,7 +659,7 @@ func (os PostSlice) LoadPostUser(ctx context.Context, exec bob.Executor, mods ..
 				continue
 			}
 
-			rel.R.Posts = append(rel.R.Posts, o)
+			rel.R.Todos = append(rel.R.Todos, o)
 
 			o.R.User = rel
 			break
@@ -669,48 +669,48 @@ func (os PostSlice) LoadPostUser(ctx context.Context, exec bob.Executor, mods ..
 	return nil
 }
 
-func attachPostUser0(ctx context.Context, exec bob.Executor, count int, post0 *Post, user1 *User) (*Post, error) {
-	setter := &PostSetter{
+func attachTodoUser0(ctx context.Context, exec bob.Executor, count int, todo0 *Todo, user1 *User) (*Todo, error) {
+	setter := &TodoSetter{
 		UserID: omit.From(user1.ID),
 	}
 
-	err := post0.Update(ctx, exec, setter)
+	err := todo0.Update(ctx, exec, setter)
 	if err != nil {
-		return nil, fmt.Errorf("attachPostUser0: %w", err)
+		return nil, fmt.Errorf("attachTodoUser0: %w", err)
 	}
 
-	return post0, nil
+	return todo0, nil
 }
 
-func (post0 *Post) InsertUser(ctx context.Context, exec bob.Executor, related *UserSetter) error {
+func (todo0 *Todo) InsertUser(ctx context.Context, exec bob.Executor, related *UserSetter) error {
 	user1, err := Users.Insert(related).One(ctx, exec)
 	if err != nil {
 		return fmt.Errorf("inserting related objects: %w", err)
 	}
 
-	_, err = attachPostUser0(ctx, exec, 1, post0, user1)
+	_, err = attachTodoUser0(ctx, exec, 1, todo0, user1)
 	if err != nil {
 		return err
 	}
 
-	post0.R.User = user1
+	todo0.R.User = user1
 
-	user1.R.Posts = append(user1.R.Posts, post0)
+	user1.R.Todos = append(user1.R.Todos, todo0)
 
 	return nil
 }
 
-func (post0 *Post) AttachUser(ctx context.Context, exec bob.Executor, user1 *User) error {
+func (todo0 *Todo) AttachUser(ctx context.Context, exec bob.Executor, user1 *User) error {
 	var err error
 
-	_, err = attachPostUser0(ctx, exec, 1, post0, user1)
+	_, err = attachTodoUser0(ctx, exec, 1, todo0, user1)
 	if err != nil {
 		return err
 	}
 
-	post0.R.User = user1
+	todo0.R.User = user1
 
-	user1.R.Posts = append(user1.R.Posts, post0)
+	user1.R.Todos = append(user1.R.Todos, todo0)
 
 	return nil
 }
