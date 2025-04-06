@@ -5,9 +5,6 @@ package models
 
 import (
 	"context"
-	"database/sql"
-	"errors"
-	"fmt"
 	"io"
 	"time"
 
@@ -20,7 +17,6 @@ import (
 	"github.com/stephenafamo/bob/dialect/psql/sm"
 	"github.com/stephenafamo/bob/dialect/psql/um"
 	"github.com/stephenafamo/bob/expr"
-	"github.com/stephenafamo/bob/mods"
 )
 
 // User is an object representing the database table.
@@ -29,8 +25,6 @@ type User struct {
 	Name      string    `db:"name" `
 	CreatedAt time.Time `db:"created_at" `
 	UpdatedAt time.Time `db:"updated_at" `
-
-	R userR `db:"-" `
 }
 
 // UserSlice is an alias for a slice of pointers to User.
@@ -42,11 +36,6 @@ var Users = psql.NewTablex[*User, UserSlice, *UserSetter]("", "users")
 
 // UsersQuery is a query on the users table
 type UsersQuery = *psql.ViewQuery[*User, UserSlice]
-
-// userR is where relationships are stored.
-type userR struct {
-	Todos TodoSlice // todos.todos_user_id_fkey
-}
 
 type userColumnNames struct {
 	ID        string
@@ -288,7 +277,6 @@ func (o *User) Update(ctx context.Context, exec bob.Executor, s *UserSetter) err
 		return err
 	}
 
-	o.R = v.R
 	*o = *v
 
 	return nil
@@ -308,7 +296,7 @@ func (o *User) Reload(ctx context.Context, exec bob.Executor) error {
 	if err != nil {
 		return err
 	}
-	o2.R = o.R
+
 	*o = *o2
 
 	return nil
@@ -355,7 +343,7 @@ func (o UserSlice) copyMatchingRows(from ...*User) {
 			if new.ID != old.ID {
 				continue
 			}
-			new.R = old.R
+
 			o[i] = new
 			break
 		}
@@ -449,224 +437,6 @@ func (o UserSlice) ReloadAll(ctx context.Context, exec bob.Executor) error {
 	}
 
 	o.copyMatchingRows(o2...)
-
-	return nil
-}
-
-type userJoins[Q dialect.Joinable] struct {
-	typ   string
-	Todos func(context.Context) modAs[Q, todoColumns]
-}
-
-func (j userJoins[Q]) aliasedAs(alias string) userJoins[Q] {
-	return buildUserJoins[Q](buildUserColumns(alias), j.typ)
-}
-
-func buildUserJoins[Q dialect.Joinable](cols userColumns, typ string) userJoins[Q] {
-	return userJoins[Q]{
-		typ:   typ,
-		Todos: usersJoinTodos[Q](cols, typ),
-	}
-}
-
-func usersJoinTodos[Q dialect.Joinable](from userColumns, typ string) func(context.Context) modAs[Q, todoColumns] {
-	return func(ctx context.Context) modAs[Q, todoColumns] {
-		return modAs[Q, todoColumns]{
-			c: TodoColumns,
-			f: func(to todoColumns) bob.Mod[Q] {
-				mods := make(mods.QueryMods[Q], 0, 1)
-
-				{
-					mods = append(mods, dialect.Join[Q](typ, Todos.Name().As(to.Alias())).On(
-						to.UserID.EQ(from.ID),
-					))
-				}
-
-				return mods
-			},
-		}
-	}
-}
-
-// Todos starts a query for related objects on todos
-func (o *User) Todos(mods ...bob.Mod[*dialect.SelectQuery]) TodosQuery {
-	return Todos.Query(append(mods,
-		sm.Where(TodoColumns.UserID.EQ(psql.Arg(o.ID))),
-	)...)
-}
-
-func (os UserSlice) Todos(mods ...bob.Mod[*dialect.SelectQuery]) TodosQuery {
-	PKArgs := make([]bob.Expression, len(os))
-	for i, o := range os {
-		PKArgs[i] = psql.ArgGroup(o.ID)
-	}
-
-	return Todos.Query(append(mods,
-		sm.Where(psql.Group(TodoColumns.UserID).In(PKArgs...)),
-	)...)
-}
-
-func (o *User) Preload(name string, retrieved any) error {
-	if o == nil {
-		return nil
-	}
-
-	switch name {
-	case "Todos":
-		rels, ok := retrieved.(TodoSlice)
-		if !ok {
-			return fmt.Errorf("user cannot load %T as %q", retrieved, name)
-		}
-
-		o.R.Todos = rels
-
-		for _, rel := range rels {
-			if rel != nil {
-				rel.R.User = o
-			}
-		}
-		return nil
-	default:
-		return fmt.Errorf("user has no relationship %q", name)
-	}
-}
-
-func ThenLoadUserTodos(queryMods ...bob.Mod[*dialect.SelectQuery]) psql.Loader {
-	return psql.Loader(func(ctx context.Context, exec bob.Executor, retrieved any) error {
-		loader, isLoader := retrieved.(interface {
-			LoadUserTodos(context.Context, bob.Executor, ...bob.Mod[*dialect.SelectQuery]) error
-		})
-		if !isLoader {
-			return fmt.Errorf("object %T cannot load UserTodos", retrieved)
-		}
-
-		err := loader.LoadUserTodos(ctx, exec, queryMods...)
-
-		// Don't cause an issue due to missing relationships
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil
-		}
-
-		return err
-	})
-}
-
-// LoadUserTodos loads the user's Todos into the .R struct
-func (o *User) LoadUserTodos(ctx context.Context, exec bob.Executor, mods ...bob.Mod[*dialect.SelectQuery]) error {
-	if o == nil {
-		return nil
-	}
-
-	// Reset the relationship
-	o.R.Todos = nil
-
-	related, err := o.Todos(mods...).All(ctx, exec)
-	if err != nil {
-		return err
-	}
-
-	for _, rel := range related {
-		rel.R.User = o
-	}
-
-	o.R.Todos = related
-	return nil
-}
-
-// LoadUserTodos loads the user's Todos into the .R struct
-func (os UserSlice) LoadUserTodos(ctx context.Context, exec bob.Executor, mods ...bob.Mod[*dialect.SelectQuery]) error {
-	if len(os) == 0 {
-		return nil
-	}
-
-	todos, err := os.Todos(mods...).All(ctx, exec)
-	if err != nil {
-		return err
-	}
-
-	for _, o := range os {
-		o.R.Todos = nil
-	}
-
-	for _, o := range os {
-		for _, rel := range todos {
-			if o.ID != rel.UserID {
-				continue
-			}
-
-			rel.R.User = o
-
-			o.R.Todos = append(o.R.Todos, rel)
-		}
-	}
-
-	return nil
-}
-
-func insertUserTodos0(ctx context.Context, exec bob.Executor, todos1 []*TodoSetter, user0 *User) (TodoSlice, error) {
-	for i := range todos1 {
-		todos1[i].UserID = omit.From(user0.ID)
-	}
-
-	ret, err := Todos.Insert(bob.ToMods(todos1...)).All(ctx, exec)
-	if err != nil {
-		return ret, fmt.Errorf("insertUserTodos0: %w", err)
-	}
-
-	return ret, nil
-}
-
-func attachUserTodos0(ctx context.Context, exec bob.Executor, count int, todos1 TodoSlice, user0 *User) (TodoSlice, error) {
-	setter := &TodoSetter{
-		UserID: omit.From(user0.ID),
-	}
-
-	err := todos1.UpdateAll(ctx, exec, *setter)
-	if err != nil {
-		return nil, fmt.Errorf("attachUserTodos0: %w", err)
-	}
-
-	return todos1, nil
-}
-
-func (user0 *User) InsertTodos(ctx context.Context, exec bob.Executor, related ...*TodoSetter) error {
-	if len(related) == 0 {
-		return nil
-	}
-
-	var err error
-
-	todos1, err := insertUserTodos0(ctx, exec, related, user0)
-	if err != nil {
-		return err
-	}
-
-	user0.R.Todos = append(user0.R.Todos, todos1...)
-
-	for _, rel := range todos1 {
-		rel.R.User = user0
-	}
-	return nil
-}
-
-func (user0 *User) AttachTodos(ctx context.Context, exec bob.Executor, related ...*Todo) error {
-	if len(related) == 0 {
-		return nil
-	}
-
-	var err error
-	todos1 := TodoSlice(related)
-
-	_, err = attachUserTodos0(ctx, exec, len(related), todos1, user0)
-	if err != nil {
-		return err
-	}
-
-	user0.R.Todos = append(user0.R.Todos, todos1...)
-
-	for _, rel := range related {
-		rel.R.User = user0
-	}
 
 	return nil
 }
