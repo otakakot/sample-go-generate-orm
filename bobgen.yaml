@@ -3,6 +3,6 @@ no_tests: true
 psql:
   dsn: "postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable"
   driver_name: "github.com/lib/pq"
-  output: "pkg/bobgen"
-  pkgname: "bobgen"
+  output: "pkg/bob/models"
+  pkgname: "models"
   uuid_pkg: "github.com/google/uuid"

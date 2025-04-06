@@ -11,8 +11,9 @@ import (
 	"github.com/aarondl/opt/omit"
 	"github.com/google/uuid"
 	"github.com/stephenafamo/bob"
+	"github.com/stephenafamo/bob/dialect/psql/im"
 
-	"github.com/otakakot/sample-go-generate-orm/pkg/bobgen"
+	"github.com/otakakot/sample-go-generate-orm/pkg/bob/models"
 )
 
 func main() {
@@ -31,21 +32,153 @@ func main() {
 		panic(err)
 	}
 
-	// create
-	user1, err := bobgen.Users.Insert(&bobgen.UserSetter{
+	// 事前データ準備
+	if _, err := db.ExecContext(ctx, "TRUNCATE TABLE users, posts CASCADE"); err != nil {
+		panic(err)
+	}
+
+	tmpUser1, err := models.Users.Insert(&models.UserSetter{
 		Name: omit.From(uuid.NewString()),
 	}).One(ctx, db)
 	if err != nil {
 		panic(err)
 	}
 
-	// transaction
+	if _, err := models.Posts.Insert(&models.PostSetter{
+		UserID:  omit.From(tmpUser1.ID),
+		Title:   omit.From("1"),
+		Content: omit.From("1"),
+	}).One(ctx, db); err != nil {
+		panic(err)
+	}
+
+	if _, err := models.Posts.Insert(&models.PostSetter{
+		UserID:  omit.From(tmpUser1.ID),
+		Title:   omit.From("2"),
+		Content: omit.From("2"),
+	}).One(ctx, db); err != nil {
+		panic(err)
+	}
+
+	if _, err := models.Posts.Insert(&models.PostSetter{
+		UserID:  omit.From(tmpUser1.ID),
+		Title:   omit.From("3"),
+		Content: omit.From("3"),
+	}).One(ctx, db); err != nil {
+		panic(err)
+	}
+
+	// SELECT
+	gots, err := models.Users.View.Query().All(ctx, db)
+	if err != nil {
+		panic(err)
+	}
+
+	for _, got := range gots {
+		slog.Info(fmt.Sprintf("user: %+v", got))
+	}
+
+	// SELECT WHERE
+	got, err := models.FindUser(ctx, db, tmpUser1.ID)
+	if err != nil {
+		panic(err)
+	}
+
+	slog.Info(fmt.Sprintf("user: %+v", got))
+
+	posts, err := models.Posts.View.Query(
+		models.SelectWhere.Posts.UserID.EQ(got.ID),
+	).All(ctx, db)
+	if err != nil {
+		panic(err)
+	}
+	for _, post := range posts {
+		slog.Info(fmt.Sprintf("post: %+v", post))
+	}
+
+	// INSERT
+	user, err := models.Users.Insert(&models.UserSetter{
+		Name: omit.From(uuid.NewString()),
+	}).One(ctx, db)
+	if err != nil {
+		panic(err)
+	}
+
+	// UPDATE
+	if err := user.Update(ctx, db, &models.UserSetter{
+		Name: omit.From("Updated " + user.Name),
+	}); err != nil {
+		panic(err)
+	}
+
+	updated, err := models.FindUser(ctx, db, tmpUser1.ID)
+	if err != nil {
+		panic(err)
+	}
+	slog.Info(fmt.Sprintf("updated user: %+v", updated))
+
+	// INSERT ON CONFLICT DO NOTHING
+	if _, err := models.Users.Insert(&models.UserSetter{
+		ID:   omit.From(user.ID),
+		Name: omit.From("Upserted " + user.Name),
+	}, im.OnConflict("id").DoNothing()).One(ctx, db); err != nil {
+		panic(err)
+	}
+
+	if user, err := models.FindUser(ctx, db, user.ID); err != nil {
+		panic(err)
+	} else {
+		slog.Info(fmt.Sprintf("upserted user: %+v", user))
+	}
+
+	// INSERT ON CONFLICT DO UPDATE
+	if _, err := models.Users.Insert(&models.UserSetter{
+		ID:   omit.From(user.ID),
+		Name: omit.From("Upserted " + updated.Name),
+	}, im.OnConflict("id").DoUpdate(
+		im.SetExcluded("name"),
+	)).One(ctx, db); err != nil {
+		panic(err)
+	}
+
+	if user, err := models.FindUser(ctx, db, user.ID); err != nil {
+		panic(err)
+	} else {
+		slog.Info(fmt.Sprintf("upserted user: %+v", user))
+	}
+
+	// DELETE
+	if err := user.Delete(ctx, db); err != nil {
+		panic(err)
+	}
+	if _, err := models.FindUser(ctx, db, user.ID); err != sql.ErrNoRows {
+		panic(err)
+	}
+
+	exists, err := models.UserExists(ctx, db, user.ID)
+	if err != nil {
+		panic(err)
+	}
+	if exists {
+		slog.Error("user exists")
+	} else {
+		slog.Info("user deleted")
+	}
+
+	count, err := models.Users.Query().Count(ctx, db)
+	if err != nil {
+		panic(err)
+	}
+
+	slog.Info(fmt.Sprintf("user count: %d", count))
+
+	// TRANSACTION
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		panic(err)
 	}
 
-	if _, err := bobgen.Users.Insert(&bobgen.UserSetter{
+	if _, err := models.Users.Insert(&models.UserSetter{
 		Name: omit.From(uuid.NewString()),
 	}).One(ctx, tx); err != nil {
 		if err := tx.Rollback(); err != nil {
@@ -53,7 +186,7 @@ func main() {
 		}
 	}
 
-	if _, err := bobgen.Users.Insert(&bobgen.UserSetter{
+	if _, err := models.Users.Insert(&models.UserSetter{
 		Name: omit.From(uuid.NewString()),
 	}).One(ctx, tx); err != nil {
 		if err := tx.Rollback(); err != nil {
@@ -65,44 +198,12 @@ func main() {
 		panic(err)
 	}
 
-	got, err := bobgen.FindUser(ctx, db, user1.ID)
+	users, err := models.Users.Query().All(ctx, db)
 	if err != nil {
 		panic(err)
 	}
 
-	slog.Info(fmt.Sprintf("got: %+v", got))
-
-	gots, err := bobgen.Users.View.Query(
-		bobgen.SelectWhere.Users.ID.EQ(user1.ID),
-		bobgen.SelectWhere.Users.Name.EQ(user1.Name),
-	).All(ctx, db)
-	if err != nil {
-		panic(err)
-	}
-
-	for _, got := range gots {
-		slog.Info(fmt.Sprintf("user: %+v", got))
-	}
-
-	// update
-	if err := user1.Update(ctx, db, &bobgen.UserSetter{
-		Name: omit.From(uuid.NewString()),
-	}); err != nil {
-		panic(err)
-	}
-
-	if user, err := bobgen.FindUser(ctx, db, user1.ID); err != nil {
-		panic(err)
-	} else {
+	for _, user := range users {
 		slog.Info(fmt.Sprintf("user: %+v", user))
-	}
-
-	// delete
-	if err := user1.Delete(ctx, db); err != nil {
-		panic(err)
-	}
-
-	if _, err := bobgen.FindUser(ctx, db, user1.ID); err != sql.ErrNoRows {
-		panic(err)
 	}
 }

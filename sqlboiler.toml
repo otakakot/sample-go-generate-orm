@@ -1,5 +1,5 @@
-pkgname  = "sqlboilergen"
-output   = "pkg/sqlboilergen"
+pkgname  = "models"
+output   = "pkg/sqlboiler/models"
 wipe     = true
 no-tests = true
 add-enum-types = true

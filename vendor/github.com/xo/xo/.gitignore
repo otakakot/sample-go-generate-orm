@@ -1,0 +1,17 @@
+/xo
+/xo.exe
+/build/
+/x/
+/tmp/
+/test/
+
+*.txt
+*.db
+*.dot
+*.json
+*.yaml
+*.yml
+*.sqlite3
+*.sqlite3-journal
+*.svg
+*.xo.sql

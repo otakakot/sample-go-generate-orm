@@ -39,7 +39,7 @@ schemafmt:
 
 .PHONY: gen
 gen: ## generate code
-	@go tool github.com/xo/xo schema postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable -o pkg/xogen
+	@go tool github.com/xo/xo schema postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable -o pkg/xo/models
 	@go tool github.com/stephenafamo/bob/gen/bobgen-psql
 	@go tool github.com/volatiletech/sqlboiler/v4 psql
 	@go mod tidy

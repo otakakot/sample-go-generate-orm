@@ -13,7 +13,7 @@ import (
 	// postgres driver.
 	_ "github.com/lib/pq"
 
-	"github.com/otakakot/sample-go-generate-orm/pkg/xogen"
+	"github.com/otakakot/sample-go-generate-orm/pkg/xo/models"
 )
 
 func main() {
@@ -33,7 +33,7 @@ func main() {
 	ctx := context.Background()
 
 	// create
-	user1 := &xogen.User{
+	user1 := &models.User{
 		ID:   uuid.New(),
 		Name: uuid.NewString(),
 	}
@@ -48,7 +48,7 @@ func main() {
 		panic(err)
 	}
 
-	user2 := &xogen.User{
+	user2 := &models.User{
 		ID:   uuid.New(),
 		Name: uuid.NewString(),
 	}
@@ -59,7 +59,7 @@ func main() {
 		}
 	}
 
-	user3 := &xogen.User{
+	user3 := &models.User{
 		ID:   uuid.New(),
 		Name: uuid.NewString(),
 	}
@@ -75,7 +75,7 @@ func main() {
 	}
 
 	// read
-	got, err := xogen.UserByID(ctx, db, user1.ID)
+	got, err := models.UserByID(ctx, db, user1.ID)
 	if err != nil {
 		panic(err)
 	}
@@ -91,7 +91,7 @@ func main() {
 		panic(err)
 	}
 
-	if user, err := xogen.UserByID(ctx, db, user1.ID); err != nil {
+	if user, err := models.UserByID(ctx, db, user1.ID); err != nil {
 		panic(err)
 	} else {
 		slog.Info(fmt.Sprintf("updated user: %+v", user))
@@ -102,7 +102,7 @@ func main() {
 		panic(err)
 	}
 
-	if _, err := xogen.UserByID(ctx, db, user1.ID); err != sql.ErrNoRows {
+	if _, err := models.UserByID(ctx, db, user1.ID); err != sql.ErrNoRows {
 		panic(err)
 	}
 }
