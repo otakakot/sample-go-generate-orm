@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/friendsofgo/errors"
+	"github.com/google/uuid"
 	"github.com/volatiletech/sqlboiler/v4/boil"
 	"github.com/volatiletech/sqlboiler/v4/queries"
 	"github.com/volatiletech/sqlboiler/v4/queries/qm"
@@ -23,7 +24,7 @@ import (
 
 // User is an object representing the database table.
 type User struct {
-	ID        string    `boil:"id" json:"id" toml:"id" yaml:"id"`
+	ID        uuid.UUID `boil:"id" json:"id" toml:"id" yaml:"id"`
 	Name      string    `boil:"name" json:"name" toml:"name" yaml:"name"`
 	CreatedAt time.Time `boil:"created_at" json:"created_at" toml:"created_at" yaml:"created_at"`
 	UpdatedAt time.Time `boil:"updated_at" json:"updated_at" toml:"updated_at" yaml:"updated_at"`
@@ -57,6 +58,27 @@ var UserTableColumns = struct {
 }
 
 // Generated where
+
+type whereHelperuuid_UUID struct{ field string }
+
+func (w whereHelperuuid_UUID) EQ(x uuid.UUID) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.EQ, x)
+}
+func (w whereHelperuuid_UUID) NEQ(x uuid.UUID) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.NEQ, x)
+}
+func (w whereHelperuuid_UUID) LT(x uuid.UUID) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.LT, x)
+}
+func (w whereHelperuuid_UUID) LTE(x uuid.UUID) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.LTE, x)
+}
+func (w whereHelperuuid_UUID) GT(x uuid.UUID) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.GT, x)
+}
+func (w whereHelperuuid_UUID) GTE(x uuid.UUID) qm.QueryMod {
+	return qmhelper.Where(w.field, qmhelper.GTE, x)
+}
 
 type whereHelperstring struct{ field string }
 
@@ -107,12 +129,12 @@ func (w whereHelpertime_Time) GTE(x time.Time) qm.QueryMod {
 }
 
 var UserWhere = struct {
-	ID        whereHelperstring
+	ID        whereHelperuuid_UUID
 	Name      whereHelperstring
 	CreatedAt whereHelpertime_Time
 	UpdatedAt whereHelpertime_Time
 }{
-	ID:        whereHelperstring{field: "\"users\".\"id\""},
+	ID:        whereHelperuuid_UUID{field: "\"users\".\"id\""},
 	Name:      whereHelperstring{field: "\"users\".\"name\""},
 	CreatedAt: whereHelpertime_Time{field: "\"users\".\"created_at\""},
 	UpdatedAt: whereHelpertime_Time{field: "\"users\".\"updated_at\""},
@@ -460,7 +482,7 @@ func Users(mods ...qm.QueryMod) userQuery {
 
 // FindUser retrieves a single record by ID with an executor.
 // If selectCols is empty Find will return all columns.
-func FindUser(ctx context.Context, exec boil.ContextExecutor, iD string, selectCols ...string) (*User, error) {
+func FindUser(ctx context.Context, exec boil.ContextExecutor, iD uuid.UUID, selectCols ...string) (*User, error) {
 	userObj := &User{}
 
 	sel := "*"
@@ -989,7 +1011,7 @@ func (o *UserSlice) ReloadAll(ctx context.Context, exec boil.ContextExecutor) er
 }
 
 // UserExists checks if the User row exists.
-func UserExists(ctx context.Context, exec boil.ContextExecutor, iD string) (bool, error) {
+func UserExists(ctx context.Context, exec boil.ContextExecutor, iD uuid.UUID) (bool, error) {
 	var exists bool
 	sql := "select exists(select 1 from \"users\" where \"id\"=$1 limit 1)"
 
